@@ -6,4 +6,4 @@ Perch and Posey is a hypothetical company that sells paper. They have 50 sales r
 
 
 
-![perch_and_posey_erd](./perch_and_posey_erd.PNG)
+![perch_and_posey_erd](./perch_and_posey_erd.png)
