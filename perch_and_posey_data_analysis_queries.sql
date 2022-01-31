@@ -39,7 +39,7 @@ ORDER BY account_id ASC, total_amt_usd DESC;
 
 --6 Now write a query that again displays order ID, account ID, and total dollar
  --amount for each order, but this time sorted first by total dollar amount (in descending order),
-  and then by account ID (in ascending order).*/
+ -- and then by account ID (in ascending order).
 SELECT  id, account_id, total_amt_usd
 FROM orders
 ORDER BY total_amt_usd DESC, account_id ASC ;
@@ -158,7 +158,7 @@ WHERE standard_qty = 0 AND gloss_qty >= 4000 OR poster_qty >= 4000;
 SELECT name, primary_poc
 FROM accounts
 WHERE (name LIKE 'C%' OR name LIKE 'W%') 
-AND (primary_poc LIKE '%ana%' OR primary_poc LIKE '%Ana%' AND primary_poc NOT LIKE '%eana') ;
+AND (primary_poc LIKE '%ana%' OR primary_poc LIKE '%Ana%' AND primary_poc NOT LIKE '%eana%') ;
 
 
 
@@ -248,7 +248,8 @@ AND o.standard_qty >100;
 
 --35 Provide the name for each region for every order, as well as the account name and the unit price they paid (total_amt_usd/total) for the order. 
 --However, you should only provide the results if the standard order quantity exceeds 100 and the poster order quantity exceeds 50. 
---Your final table should have 3 columns: region name, account name, and unit price. Sort for the smallest unit price first. In order to avoid a division by zero error, adding .01 to the denominator here is helpful (total_amt_usd/(total+0.01). 
+--Your final table should have 3 columns: region name, account name, and unit price. Sort for the smallest unit price first. In order 
+--to avoid a division by zero error, adding .01 to the denominator here is helpful (total_amt_usd/(total+0.01). 
 SELECT r.name, a.name, (o.total_amt_usd/o.total) AS unit_price, o.total
 FROM region r
 JOIN sales_reps s
@@ -285,12 +286,14 @@ JOIN web_events w
 ON a.id = w.account_id
 AND a.id = 1001;
 
--- 38 Find all the orders that occurred in 2015. Your final table should have 4 columns: occurred_at, account name, order total, and order total_amt_usd. 
+-- 38 Find all the orders that occurred in 2015. Your final table should have 4 columns: occurred_at, account name, order total, and order total_amt_usd.
+--Note that you if you use BETWEEN to filter it assumes the date limit for example 2015-12-31  as 2015-12-31 00:00:00. So it won't capture later times on the same day 
 SELECT DISTINCT a.name account_name, o.total order_total, o.total_amt_usd total_amt_usd, o.occurred_at
 FROM orders o
 LEFT JOIN accounts a
 ON a.id = o.account_id
-WHERE o.occurred_at BETWEEN '2015-01-01' AND '2016-01-01' ;
+WHERE o.occurred_at BETWEEN '2015-01-01' AND '2016-01-01' 
+--WHERE o.occurred_at BETWEEN '2015-01-01' AND '2015-12-31 23:59:59';
 
 --39 Find the total amount of poster_qty paper ordered in the orders table.
 SELECT SUM (poster_qty)
@@ -321,8 +324,10 @@ FROM orders;
 SELECT MAX(occurred_at)
 FROM orders;
 
---46 Find the mean (AVERAGE) amount spent per order on each paper type, as well as the mean amount of each paper type purchased per order. 
---Your final answer should have 6 values - one for each paper type for the average number of sales, as well as the average amount.
+--46 Find the mean (AVERAGE) amount spent per order on each paper type, 
+--as well as the mean amount of each paper type purchased per order. 
+--Your final answer should have 6 values - one for each paper type for 
+--the average number of sales, as well as the average amount.
 SELECT AVG(standard_qty) mean_standard, AVG(gloss_qty) mean_gloss, 
 AVG(poster_qty) mean_poster, AVG(standard_amt_usd) mean_standard_usd,
 AVG(gloss_amt_usd) mean_gloss_usd, AVG(poster_amt_usd) mean_poster_usd
@@ -331,10 +336,31 @@ FROM orders;
 
 
 --47 What is the MEDIAN total_usd spent on all orders? 
-SELECT AVG(total_amt_usd)
-FROM(SELECT total_amt_usd FROM(SELECT total_amt_usd FROM orders ORDER BY total_amt_usd LIMIT 3457) tab
+WITH tab2 AS (SELECT  total_amt_usd
+FROM(
+	SELECT total_amt_usd
+	FROM orders
+	ORDER BY total_amt_usd ASC
+	LIMIT (SELECT CEIL(COUNT(total_amt_usd)/2.0)
+	FROM orders)) AS tab21
 ORDER BY total_amt_usd DESC
-LIMIT 2) tab2;
+LIMIT 1),
+
+tab3 AS (SELECT  total_amt_usd
+FROM(
+	SELECT total_amt_usd
+	FROM orders
+	ORDER BY total_amt_usd ASC
+	LIMIT (SELECT COUNT(total_amt_usd)/2.0 +1 
+	FROM orders)) AS tab31
+ORDER BY total_amt_usd DESC
+LIMIT 2)
+
+SELECT CASE WHEN COUNT(total_amt_usd) % 2 = 0 THEN  (SELECT AVG(total_amt_usd) FROM tab3)
+		ELSE (SELECT total_amt_usd FROM tab2)
+
+            END AS median_amt_usd
+FROM orders;
 
 --48 Which account (by name) placed the earliest order? Include the account name and the date of the order.
 SELECT a.name account,   o.occurred_at
@@ -387,11 +413,12 @@ ORDER BY total_usd ASC;
 --54 Find the number of sales reps in each region. Your final table should have two columns - the region and the number of sales_reps. 
 --Order from fewest reps to most reps
 
-SELECT r.name region,  COUNT(s.name) no_sales_rep
-FROM region r 
+SELECT r.name AS region, COUNT(s.name) AS number_of_sales_rep
+FROM region r
 JOIN sales_reps s
 ON r.id = s.region_id
-GROUP BY region;
+GROUP BY r.name
+ORDER BY number_of_sales_rep ASC;
 
 --55 For each account, determine the average amount of each type of paper they purchased across their orders. 
 --Your result should have four columns - one for the account name and one for the average quantity purchased for each of the paper types for each account. 
@@ -440,41 +467,42 @@ GROUP BY r.name, channel
 ORDER BY channel_no_of_time_used DESC;
 
 --57 Use DISTINCT to test if there are any accounts associated with more than one region. Yes, both queries give same result
-SELECT COUNT(*)
+SELECT a.name, COUNT (DISTINCT r.name) region_count
 FROM accounts a
 JOIN sales_reps s
-ON s.id = a.sales_rep_id
+ON a.sales_rep_id = s.id
 JOIN region r
 ON r.id = s.region_id
-
-SELECT COUNT(DISTINCT a.name)
-FROM accounts a
+GROUP BY a.name
+HAVING COUNT (DISTINCT r.name) > 1
 
 --58 Have any sales reps worked on more than one account? Yes, 1st query gives 351 while 2nd gives 50
-SELECT  COUNT(*)
+SELECT s.name, COUNT (DISTINCT a.name)
 FROM accounts a
 JOIN sales_reps s
-ON s.id = a.sales_rep_id;
-
-SELECT  COUNT(DISTINCT id)
-FROM sales_reps
-;
+ON a.sales_rep_id = s.id
+GROUP BY s.name
+HAVING COUNT (DISTINCT a.name) > 1 
+ORDER BY COUNT (DISTINCT a.name) DESC
 
 --59 How many of the sales reps have more than 5 accounts that they manage?
-SELECT s.name sales_rep, COUNT(a.name) no_managed_acc 
-FROM sales_reps s 
-JOIN accounts a
-ON s.id = a.sales_rep_id
-GROUP BY s.name
-HAVING COUNT(a.name)  > 5
+SELECT COUNT (*)
+FROM (SELECT s.name
+      FROM accounts a
+      JOIN sales_reps s
+      ON a.sales_rep_id = s.id
+      GROUP BY s.name
+      HAVING COUNT (DISTINCT a.name) > 5) AS tab1
 
 --60 How many accounts have more than 20 orders?
-SELECT a.name, COUNT(*) oders_count
-FROM orders o 
-JOIN accounts a
+SELECT COUNT(*)
+FROM(
+SELECT a.name
+FROM accounts a
+JOIN orders o
 ON a.id = o.account_id
 GROUP BY a.name
-HAVING COUNT(*)  > 20
+HAVING COUNT(o.id) > 20) AS tab2
 
 --61 Which account has the most orders? There are 3 accounts with the topmost 21 orders
 SELECT a.name, COUNT(*) orders_count
