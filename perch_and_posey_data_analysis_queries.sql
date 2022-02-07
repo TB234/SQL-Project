@@ -505,13 +505,13 @@ GROUP BY a.name
 HAVING COUNT(o.id) > 20) AS tab2
 
 --61 Which account has the most orders? There are 3 accounts with the topmost 21 orders
-SELECT a.name, COUNT(*) orders_count
-FROM orders o 
-JOIN accounts a
+SELECT a.name, COUNT(o.id) AS orders_count
+FROM accounts a
+JOIN orders o
 ON a.id = o.account_id
 GROUP BY a.name
-HAVING COUNT(*)  > 20
-ORDER BY orders_count;
+ORDER BY orders_count DESC
+LIMIT 1;
 
 --62 Which accounts spent more than 30,000 usd total across all orders?
 SELECT a.name, sum(total_amt_usd) total_ord_usd
@@ -570,13 +570,13 @@ ORDER BY COUNT (w.channel) DESC
 LIMIT 1;
 
 --68 Which channel was most frequently used by most accounts?
-SELECT a.name, w.channel,   COUNT (w.channel) channel_used
+SELECT w.channel,   COUNT (a.name) accounts_count
 FROM accounts a
 JOIN web_events w
 ON a.id = w.account_id
-GROUP BY  a.name, w.channel
-ORDER BY COUNT (w.channel) DESC
-LIMIT 7;
+GROUP BY   w.channel
+ORDER BY COUNT (a.name) DESC
+LIMIT 1;
 
 
 --69 Find the sales in terms of total dollars for all orders in each year, ordered from greatest to least. Do you notice any trends in the yearly sales totals? 
@@ -604,7 +604,13 @@ WHERE occurred_at BETWEEN '2014-01-01' AND '2017-01-01'
 GROUP BY 1
 ORDER BY 2 DESC; 
 
---71 Which year did Parch & Posey have the greatest sales in terms of total number of orders? Are all years evenly represented by the dataset?
+-- Months are not evenly spread out. Only 1 month data for 2013 and 2017. Other years have 12months
+SELECT DATE_PART('YEAR', occurred_at) year_,  COUNT (DISTINCT DATE_PART('MONTH', occurred_at)) distinct_months_
+FROM orders
+GROUP BY 1;
+
+--71 Which year did Parch & Posey have the greatest sales in terms of total number of orders? 
+--Are all years evenly represented by the dataset?
 SELECT DATE_PART('year', occurred_at) year_, COUNT(id) order_count
 FROM orders
 GROUP BY 1
@@ -692,7 +698,8 @@ ORDER BY 2 DESC;
 
 
 --79 The previous didn't account for the middle, nor the dollar amount associated with the sales. Management decides they want to see these characteristics represented as well.
--- We would like to identify top performing sales reps, which are sales reps associated with more than 200 orders or more than 750000 in total sales. The middle group has any rep with more than 150 orders or 500000 in sales. Create a table with the sales rep name, the total number of orders, total sales across all orders, and a column with top, middle, or low depending on this criteria. Place the top sales people based on dollar amount of sales first in your final table. You might see a few upset sales people by this criteria!
+-- We would like to identify top performing sales reps, which are sales reps associated with more than 200 orders or more than 750000 in total sales. 
+--The middle group has any rep with more than 150 orders or 500000 in sales. Create a table with the sales rep name, the total number of orders, total sales across all orders, and a column with top, middle, or low depending on this criteria. Place the top sales people based on dollar amount of sales first in your final table. You might see a few upset sales people by this criteria!
 SELECT s.name sales_rep, COUNT(o.id) total_orders, sum(total_amt_usd) total_order_val,
       CASE WHEN COUNT(o.id) > 200 OR sum(total_amt_usd) > 75000 THEN 'top'
             WHEN COUNT(o.id) > 150 OR sum(total_amt_usd) > 50000 THEN 'middle'
@@ -720,7 +727,8 @@ ORDER BY channel;
 SELECT channel, DATE_TRUNC('day', occurred_at) event_day, COUNT(*) num_event
 FROM web_events
 GROUP BY channel, 2
-ORDER BY  num_event DESC;
+ORDER BY  num_event DESC
+LIMIT 1;
 
 
 --82 What is the average amount of standard paper sold on the first month that any order was placed in the orders table (in terms of quantity).
@@ -857,6 +865,21 @@ SELECT tab1.region, tab2.order_count
 FROM tab1
 JOIN tab2
 ON tab1.region = tab2.region;
+
+--Solution 3
+SELECT r.name region, SUM(o.total_amt_usd) sum_usd, COUNT(o.id) order_count 
+FROM sales_reps s
+JOIN region r
+ON s.region_id = r.id
+JOIN accounts a
+ON a.sales_rep_id = s.id
+JOIN orders o 
+ON o.account_id = a.id
+GROUP BY 1
+ORDER BY 2 DESC
+LIMIT 1;
+    
+    
 
 --88 How many accounts had more total purchases than the account name which has bought the most standard_qty paper throughout their lifetime as a customer? 3
 --Soltion 1
@@ -1007,7 +1030,7 @@ GROUP BY 1
 
 --91 There is much debate about how much the name (or even the first letter of a company name) matters. 
 --Use the accounts table to pull the first letter of each company name to see the distribution of company names that begin with each letter (or number). 
-SELECT LEFT(JPPER(name), 1) AS first_letter_comp, COUNT(*)
+SELECT LEFT(UPPER(name), 1) AS first_letter_comp, COUNT(*)
 FROM accounts
 GROUP BY 1
 ORDER BY 2 DESC
@@ -1114,9 +1137,10 @@ FROM accounts a
 LEFT JOIN orders o
 ON a.id = o.account_id;
 
+
 --100 Create running total of standard_amt_usd over ordered time
 SELECT standard_amt_usd,
-      SUM(standard_amt_usd) OVER(occurred_at ORDER BY date) AS running_total
+      SUM(standard_amt_usd) OVER(ORDER BY occurred_at) AS running_total
 FROM orders;
 
 -- 101 Create running total of standard_amt_usd over ordered time and partitioned over the years
